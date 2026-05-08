@@ -8,18 +8,11 @@ import { useUserLocation } from '../../context/LocationContext';
 
 const WishlistPage = () => {
     const { wishlistItems, toggleWishlist } = useWishlist();
-    const { addToCart, getCartCount } = useCart();
+    const { getCartCount } = useCart();
     const cartCount = getCartCount();
     const { activeAddress } = useUserLocation();
     const navigate = useNavigate();
     const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
-    const [addedItems, setAddedItems] = useState({});
-
-    const handleAddToCart = (product) => {
-        addToCart({ ...product, selectedSize: product.size ? product.size[0] : 'M' });
-        setAddedItems(prev => ({ ...prev, [product.id]: true }));
-        // Optional: show a toast or message
-    };
 
     return (
         <div className="bg-white min-h-screen pb-20">
@@ -108,14 +101,6 @@ const WishlistPage = () => {
                                             </>
                                         )}
                                     </div>
-
-                                    <button
-                                        onClick={() => handleAddToCart(product)}
-                                        disabled={addedItems[product.id]}
-                                        className={`w-full py-1.5 md:py-3 border-2 rounded-lg md:rounded-xl text-[10px] md:text-[12px] font-black uppercase tracking-tight transition-all active:scale-[0.98] flex items-center justify-center gap-2 ${addedItems[product.id] ? 'bg-black text-white border-black cursor-default' : 'bg-white border-black/80 hover:border-black hover:bg-black hover:text-white'}`}
-                                    >
-                                        {addedItems[product.id] ? 'Added' : 'Move to Cart'}
-                                    </button>
                                 </div>
                             </div>
                         ))}
