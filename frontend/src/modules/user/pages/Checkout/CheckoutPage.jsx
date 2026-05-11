@@ -25,6 +25,7 @@ import toast from 'react-hot-toast';
 import LocationModal from '../../components/Header/LocationModal';
 import CouponsModal from '../../components/Checkout/CouponsModal';
 import { normalizeProduct } from '../../../../shared/store/productStore';
+import { useSettingsStore } from '../../../../shared/store/settingsStore';
 
 
 const CheckoutPage = () => {
@@ -33,6 +34,7 @@ const CheckoutPage = () => {
     const { user } = useAuth();
     const { activeAddress } = useUserLocation();
     const { fetchAddresses } = useAddressStore();
+    const { settings, initializePublic } = useSettingsStore();
 
     const [showSizeModal, setShowSizeModal] = useState(null); // productId for which to show modal
     const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
@@ -76,14 +78,22 @@ const CheckoutPage = () => {
     useEffect(() => {
         // Scroll to top on mount
         window.scrollTo(0, 0);
-        // Refresh addresses to ensure latest data
+        // Refresh addresses and settings to ensure latest data
         fetchAddresses().catch(() => { });
-    }, [fetchAddresses]);
+        initializePublic().catch(() => { });
+    }, [fetchAddresses, initializePublic]);
 
     const totalPrice = getCartTotal();
-    const shipping = totalPrice > 500 ? 0 : 40;
+    const totalMRP = cart.reduce((acc, item) => acc + (Number(item.originalPrice || item.price) * item.quantity), 0);
+    const bagDiscount = Math.max(0, totalMRP - totalPrice);
+    
+    // Dynamic values from settings
+    const shippingThreshold = settings?.shipping?.freeShippingThreshold || 500;
+    const defaultShippingRate = settings?.shipping?.defaultShippingRate || 40;
+    const platformFee = settings?.orders?.platformFee || 20;
+
+    const shipping = totalPrice > shippingThreshold ? 0 : defaultShippingRate;
     const tax = 0; // GST removed as per user request
-    const platformFee = 20; // Convenience / Platform fee
     
     let promoDiscount = 0;
     if (appliedPromo) {
@@ -338,8 +348,7 @@ const CheckoutPage = () => {
                                         <div className="flex-1">
                                             <h4 className="text-[11px] font-bold text-gray-900 uppercase  mb-1">Try & Buy Service</h4>
                                             <p className="text-[10px] text-gray-500 font-medium leading-relaxed">
-                                                Feel confident with your purchase! Try your items at home while the delivery partner waits. 
-                                                Keep what fits and return any items you don't want right there on the spot.
+                                                Try the product at your doorstep before making the payment. If you like it, pay the delivery partner. You can also return the product instantly at the door if needed.
                                             </p>
                                         </div>
                                     </div>
@@ -351,8 +360,7 @@ const CheckoutPage = () => {
                                         <div className="flex-1">
                                             <h4 className="text-[11px] font-bold text-gray-900 uppercase  mb-1">Check & Buy Service</h4>
                                             <p className="text-[10px] text-gray-500 font-medium leading-relaxed">
-                                                Open your package to verify the product quality, appearance, and authenticity 
-                                                before you make the final payment. Ensure you're getting exactly what you ordered.
+                                                You can check the product in front of the delivery partner before payment. Once satisfied, you can make the payment. A 24-hour return option is also available after delivery.
                                             </p>
                                         </div>
                                     </div>
@@ -399,13 +407,15 @@ const CheckoutPage = () => {
                             <span className="text-sm font-bold uppercase ">Delivery Estimate</span>
                         </div>
                         <div className="flex items-center gap-4">
-                            <div className="bg-white px-4 py-2 rounded-xl text-center">
-                                <p className="text-[10px] font-bold text-gray-400 uppercase">Instant</p>
-                                <p className="text-xs font-bold">Delivery in 60 Mins</p>
+                            <div className="bg-blue-50/50 px-4 py-3 rounded-2xl border border-blue-100/50 flex items-center justify-between w-full">
+                                <div className="flex flex-col">
+                                    <p className="text-[10px] font-bold text-blue-600/60 uppercase tracking-wider mb-0.5">Estimated Arrival</p>
+                                    <p className="text-sm font-bold text-gray-900">Delivery within <span className="text-blue-600">{getDeliveryDateInfo()}</span></p>
+                                </div>
+                                <div className="px-3 py-1.5 bg-blue-600 rounded-xl shadow-sm shadow-blue-100">
+                                    <span className="text-[10px] font-bold text-white uppercase tracking-tight">Instant Delivery</span>
+                                </div>
                             </div>
-                            <p className="text-xs font-bold text-gray-500 flex-1">
-                                Delivery within <span className="text-black">{getDeliveryDateInfo()}</span>
-                            </p>
                         </div>
                     </div>
 
@@ -525,16 +535,16 @@ const CheckoutPage = () => {
                         <div className="space-y-4">
                             <div className="flex justify-between text-[13px] font-bold text-gray-500 uppercase ">
                                 <span>Bag Total</span>
-                                <span className="text-black">₹{totalPrice}</span>
+                                <span className="text-black">₹{Number(totalMRP.toFixed(2)).toLocaleString()}</span>
                             </div>
                             <div className="flex justify-between text-[13px] font-bold text-gray-500 uppercase ">
                                 <span>Bag Discount</span>
-                                <span className="text-[#10B981]">-₹0</span>
+                                <span className="text-[#10B981]">-₹{Number(bagDiscount.toFixed(2)).toLocaleString()}</span>
                             </div>
                             {appliedPromo && (
                                 <div className="flex justify-between text-[13px] font-bold text-[#10B981] uppercase animate-fadeInUp">
                                     <span>Promo Discount</span>
-                                    <span>-₹{promoDiscount.toFixed(0)}</span>
+                                    <span>-₹{promoDiscount.toFixed(2)}</span>
                                 </div>
                             )}
                             <div className="flex justify-between text-[13px] font-bold text-gray-500 uppercase ">
@@ -551,7 +561,7 @@ const CheckoutPage = () => {
 
                         <div className="flex justify-between items-center py-2">
                             <span className="text-sm font-bold uppercase text-black">Order Total</span>
-                            <span className="text-xl font-bold italic er text-[#9F1239]">₹{finalTotal}</span>
+                            <span className="text-xl font-bold italic er text-[#9F1239]">₹{Number(finalTotal.toFixed(2)).toLocaleString()}</span>
                         </div>
                     </div>
                 </main>

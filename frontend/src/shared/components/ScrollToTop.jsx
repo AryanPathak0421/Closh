@@ -16,6 +16,16 @@ const ScrollToTop = () => {
       behavior: 'instant', // Use 'instant' for immediate scroll, or 'smooth' for animated
     });
 
+    // Handle user module scroll container
+    const userScrollContainer = document.getElementById('user-scroll-container');
+    if (userScrollContainer) {
+      userScrollContainer.scrollTo({
+        top: 0,
+        left: 0,
+        behavior: 'instant',
+      });
+    }
+
     // Also handle scrollable main containers in admin layouts
     // Use setTimeout to ensure DOM is updated after route change
     setTimeout(() => {

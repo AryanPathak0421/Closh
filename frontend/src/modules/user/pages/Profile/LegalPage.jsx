@@ -94,30 +94,33 @@ const LegalPage = () => {
 
     useEffect(() => {
         const fetchContent = async () => {
-            setIsLoading(true);
+            // Keep existing pageContent visible while fetching updates if possible
+            const legalData = getLegalData(settings);
+            
             try {
                 await initializePublic();
-                const legalData = getLegalData(settings);
-
+                
                 const key = keyMap[pageId];
                 if (key) {
-                    // Try 'content' category first (User edits in Content & Features go here)
+                    // Try 'content' category first
                     const contentRes = await getPublicSetting('content', true);
                     if (contentRes?.data && contentRes.data[key]) {
                         setPageContent({
                             title: legalData[pageId]?.title || 'Information',
                             content: contentRes.data[key]
                         });
+                        setIsLoading(false);
                         return;
                     }
 
-                    // Try direct key next (Seeded defaults or specific Policy pages)
+                    // Try direct key next
                     const res = await getPublicSetting(key, true);
-                    if (res?.data && !res.data.includes('<h1>Terms and Conditions</h1>')) { // Avoid placeholder
+                    if (res?.data && !res.data.includes('<h1>Terms and Conditions</h1>')) {
                         setPageContent({
                             title: legalData[pageId]?.title || 'Information',
                             content: res.data
                         });
+                        setIsLoading(false);
                         return;
                     }
                 }
@@ -140,9 +143,9 @@ const LegalPage = () => {
         };
 
         fetchContent();
-    }, [pageId, settings?.general]);
+    }, [pageId]); // Removed settings?.general to avoid unnecessary re-triggers
 
-    if (isLoading) return <div className="p-20 text-center text-gray-400 font-bold uppercase  animate-pulse">Loading...</div>;
+    if (isLoading && !pageContent) return <div className="p-20 text-center text-gray-400 font-bold uppercase animate-pulse">Loading...</div>;
     if (!pageContent) return null;
 
     return (
