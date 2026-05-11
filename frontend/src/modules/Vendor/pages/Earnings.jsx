@@ -269,9 +269,9 @@ const Earnings = () => {
                               </p>
                             </div>
                             <div>
-                              <p className="text-gray-600">Subtotal</p>
+                              <p className="text-gray-600">Base Price</p>
                               <p className="font-semibold text-gray-800">
-                                {formatPrice(commission.subtotal)}
+                                {formatPrice(commission.basePrice)}
                               </p>
                             </div>
                             <div>

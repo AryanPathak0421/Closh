@@ -95,7 +95,10 @@ const AllOrders = () => {
     const vendorItem = order.vendorItems?.find(
       (vi) => vi.vendorId?.toString() === vendorId?.toString()
     );
-    return vendorItem?.basePrice ?? vendorItem?.subtotal ?? order.total ?? order.totalAmount ?? 0;
+    // Prioritize basePrice (vendor price sum) over subtotal (customer price sum)
+    return vendorItem?.basePrice ?? 
+           vendorItem?.items?.reduce((sum, it) => sum + (it.vendorPrice ?? it.price ?? 0) * (it.quantity ?? 1), 0) ??
+           vendorItem?.subtotal ?? 0;
   };
 
   const getOrderStatus = (order) => {
@@ -180,7 +183,7 @@ const AllOrders = () => {
     },
     {
       key: 'totalAmount',
-      label: 'Amount',
+      label: 'Your Amount',
       sortable: true,
       render: (_, row) => (
         <span className="font-semibold text-gray-800">

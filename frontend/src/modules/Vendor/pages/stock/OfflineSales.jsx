@@ -60,7 +60,7 @@ const OfflineSales = () => {
         id: p._id,
         productId: p._id,
         productName: p.name,
-        price: p.price || p.vendorPrice,
+        price: p.vendorPrice || p.price,
         stock: p.stockQuantity,
         unit: p.unit || "Piece",
         category: p.categoryId?.name || "Uncategorized",
@@ -331,7 +331,7 @@ const OfflineSales = () => {
     },
     {
       key: "price",
-      label: "PRICE",
+      label: "YOUR PRICE",
       sortable: true,
       render: (value) => <span className="text-gray-900 font-black text-[10px] md:text-xs">{formatPrice(value)}</span>,
     },
@@ -409,7 +409,7 @@ const OfflineSales = () => {
               headers={[
                 { label: "ID", accessor: "id" }, 
                 { label: "Product", accessor: "productName" }, 
-                { label: "Price", accessor: (row) => formatPrice(row.price) }
+                { label: "Your Price", accessor: (row) => formatPrice(row.price) }
               ]} 
               filename="offline-sales" 
             />
@@ -462,10 +462,10 @@ const OfflineSales = () => {
 
                 {/* Pricing & Stock Grid */}
                 <div className="grid grid-cols-3 gap-2 py-2 border-y border-emerald-50/50">
-                   <div className="flex flex-col gap-0.5">
-                      <span className="text-[8px] font-black text-gray-400 uppercase">Price</span>
-                      <span className="text-[11px] font-black text-gray-900">{formatPrice(sale.price)}</span>
-                   </div>
+                    <div className="flex flex-col gap-0.5">
+                       <span className="text-[8px] font-black text-gray-400 uppercase">Your Price</span>
+                       <span className="text-[11px] font-black text-gray-900">{formatPrice(sale.price)}</span>
+                    </div>
                    <div className="flex flex-col gap-0.5">
                       <span className="text-[8px] font-black text-gray-400 uppercase">Stock</span>
                       <span className="text-[11px] font-black text-gray-900">{sale.stock} <span className="text-[8px] text-gray-400">{sale.unit}</span></span>
@@ -650,10 +650,10 @@ const OfflineSales = () => {
                 </div>
 
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-5">
-                   <div className="space-y-1">
-                      <label className="text-[10px] md:text-xs font-black text-emerald-800 uppercase ml-1">Price *</label>
-                      <input type="number" required value={formData.price} onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) })} className="w-full px-3 py-2.5 bg-emerald-50/20 border border-emerald-50 rounded-xl focus:ring-1 focus:ring-emerald-500 text-xs md:text-sm font-bold" placeholder="0.00" />
-                   </div>
+                    <div className="space-y-1">
+                       <label className="text-[10px] md:text-xs font-black text-emerald-800 uppercase ml-1">Your Price *</label>
+                       <input type="number" required value={formData.price} onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) })} className="w-full px-3 py-2.5 bg-emerald-50/20 border border-emerald-50 rounded-xl focus:ring-1 focus:ring-emerald-500 text-xs md:text-sm font-bold" placeholder="0.00" />
+                    </div>
                    <div className="space-y-1">
                       <label className="text-[10px] md:text-xs font-black text-gray-400 uppercase ml-1">MRP</label>
                       <input type="number" value={formData.originalPrice} onChange={(e) => setFormData({ ...formData, originalPrice: parseFloat(e.target.value) })} className="w-full px-3 py-2.5 bg-gray-50/50 border border-gray-100 rounded-xl focus:ring-1 focus:ring-emerald-500 text-xs md:text-sm font-bold" placeholder="0.00" />

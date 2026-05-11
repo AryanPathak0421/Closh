@@ -192,7 +192,9 @@ const OrderDetail = () => {
 
     // Items this vendor sold in this order
     const vendorItems = vendorItem?.items ?? [];
-    const vendorSubtotal = vendorItem?.subtotal ?? 0;
+    const vendorSubtotal = vendorItem?.basePrice ?? 
+                          vendorItem?.items?.reduce((sum, it) => sum + (it.vendorPrice ?? it.price ?? 0) * (it.quantity ?? 1), 0) ??
+                          vendorItem?.subtotal ?? 0;
 
     const [showInvoice, setShowInvoice] = useState(false);
 
@@ -302,9 +304,9 @@ const OrderDetail = () => {
                                                 <p className="text-xs text-gray-400 mt-1">{formatVariantLabel(item.variant)}</p>
                                             )}
                                         </td>
-                                        <td className="py-6 text-right font-medium text-gray-600">{formatPrice(item.vendorPrice || item.price || 0)}</td>
+                                        <td className="py-6 text-right font-medium text-gray-600">{formatPrice(item.vendorPrice ?? item.price ?? 0)}</td>
                                         <td className="py-6 text-center font-bold text-gray-900">{item.quantity}</td>
-                                        <td className="py-6 text-right font-bold text-gray-900">{formatPrice((item.vendorPrice || item.price || 0) * item.quantity)}</td>
+                                        <td className="py-6 text-right font-bold text-gray-900">{formatPrice((item.vendorPrice ?? item.price ?? 0) * item.quantity)}</td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -313,8 +315,8 @@ const OrderDetail = () => {
                         <div className="flex justify-end">
                             <div className="w-full max-w-xs space-y-3">
                                 <div className="flex justify-between text-sm">
-                                    <span className="text-gray-500">Vendor Subtotal</span>
-                                    <span className="font-bold text-gray-900">{formatPrice(vendorItem?.basePrice || vendorItem?.subtotal || 0)}</span>
+                                    <span className="text-gray-500">Your Base Price</span>
+                                    <span className="font-bold text-gray-900">{formatPrice(vendorSubtotal)}</span>
                                 </div>
                                 <div className="flex justify-between text-sm border-t border-dashed border-gray-200 pt-2">
                                     <span className="text-gray-500">Platform Commission</span>
@@ -512,7 +514,7 @@ const OrderDetail = () => {
                                         Your Total Base Price
                                     </p>
                                     <p className="text-lg font-bold text-gray-800">
-                                        {formatPrice(vendorItem?.basePrice || vendorItem?.subtotal || 0)}
+                                        {formatPrice(vendorSubtotal)}
                                     </p>
                                     <div className="mt-2 pt-2 border-t border-gray-100 space-y-1">
                                         <div className="flex justify-between text-sm">
