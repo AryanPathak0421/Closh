@@ -134,20 +134,64 @@ const Header = ({ variant = 'default', showCategoryBar = true }) => {
         return () => target.removeEventListener('scroll', handleScroll);
     }, [lastScrollY]);
 
+    // Helper: resolve category hierarchy from the store
+    const getCategoryHierarchy = (catId) => {
+        const cat = storeCategories.find(c => String(c.id || c._id) === String(catId));
+        if (!cat) return null;
+        if (cat.parentId) {
+            const parentIdStr = typeof cat.parentId === 'object' ? (cat.parentId._id || cat.parentId.id || cat.parentId) : cat.parentId;
+            const parent = storeCategories.find(c => String(c.id || c._id) === String(parentIdStr));
+            return { name: cat.name, parent: parent?.name || '', image: cat.image || parent?.image || '' };
+        }
+        return { name: cat.name, parent: '', image: cat.image || '' };
+    };
+
     const handleSearchInput = async (value) => {
         setSearchQuery(value);
         if (value.trim().length > 0) {
             setIsSearching(true);
             try {
                 const response = await api.get('/products', {
-                    params: { search: value, limit: 5 }
+                    params: { search: value, limit: 30 }
                 });
                 const products = response?.data?.data?.products || response?.data?.products || response?.products || [];
-                setSearchSuggestions(products.map(p => ({
-                    ...p,
-                    id: p._id || p.id,
-                    image: p.image || p.images?.[0] || 'https://via.placeholder.com/50x50'
-                })));
+
+                // Group products by categoryId to build category suggestions
+                const categoryMap = new Map();
+                for (const p of products) {
+                    const catId = p.categoryId?._id || p.categoryId?.id || p.categoryId || '';
+                    const catIdStr = String(catId);
+                    if (!catIdStr || categoryMap.has(catIdStr)) continue;
+                    const hierarchy = getCategoryHierarchy(catIdStr);
+                    categoryMap.set(catIdStr, {
+                        id: p._id || p.id,
+                        categoryId: catIdStr,
+                        categoryName: hierarchy?.name || p.categoryId?.name || 'Category',
+                        parentName: hierarchy?.parent || '',
+                        image: p.image || p.images?.[0] || hierarchy?.image || 'https://via.placeholder.com/50x50',
+                        productName: p.name || '',
+                    });
+                }
+
+                // Also include categories from the store whose name matches the search
+                const lowerQ = value.toLowerCase();
+                for (const cat of storeCategories) {
+                    if (cat.isActive === false) continue;
+                    const catIdStr = String(cat.id || cat._id);
+                    if (categoryMap.has(catIdStr)) continue;
+                    if (!cat.name.toLowerCase().includes(lowerQ)) continue;
+                    const hierarchy = getCategoryHierarchy(catIdStr);
+                    categoryMap.set(catIdStr, {
+                        id: catIdStr,
+                        categoryId: catIdStr,
+                        categoryName: hierarchy?.name || cat.name,
+                        parentName: hierarchy?.parent || '',
+                        image: cat.image || hierarchy?.image || 'https://via.placeholder.com/50x50',
+                        productName: '',
+                    });
+                }
+
+                setSearchSuggestions(Array.from(categoryMap.values()).slice(0, 10));
             } catch (error) {
                 console.error("Search failed:", error);
                 setSearchSuggestions([]);
@@ -168,7 +212,12 @@ const Header = ({ variant = 'default', showCategoryBar = true }) => {
     };
 
     const handleSuggestionClick = (suggestion) => {
-        navigate(`/product/${suggestion.id}`);
+        const catId = suggestion.categoryId;
+        if (catId && /^[0-9a-fA-F]{24}$/.test(String(catId))) {
+            navigate(`/products?cid=${catId}`);
+        } else {
+            navigate(`/products?search=${encodeURIComponent(suggestion.categoryName || searchQuery)}`);
+        }
         setSearchQuery('');
         setSearchSuggestions([]);
     };
@@ -399,7 +448,7 @@ const Header = ({ variant = 'default', showCategoryBar = true }) => {
                                 {searchSuggestions.length > 0 && (
                                     <div className="absolute top-[calc(100%+8px)] left-0 w-full bg-white rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-hidden z-[1010] border border-black/5 animate-fadeInUp">
                                         <div className="p-3 border-b border-black/5 flex items-center justify-between bg-gray-50/50">
-                                            <span className="text-[10px] font-bold uppercase text-black/40">Suggested Products</span>
+                                            <span className="text-[10px] font-bold uppercase text-black/40">Suggested Categories</span>
                                             <span 
                                                 onClick={() => handleSearch({ key: 'Enter' })}
                                                 className="text-[10px] font-bold text-black uppercase hover:underline cursor-pointer"
@@ -410,19 +459,19 @@ const Header = ({ variant = 'default', showCategoryBar = true }) => {
                                         <div className="max-h-[400px] overflow-y-auto scrollbar-hide">
                                             {searchSuggestions.map((item) => (
                                                 <div
-                                                    key={item.id}
+                                                    key={item.categoryId}
                                                     onClick={() => handleSuggestionClick(item)}
                                                     className="px-5 py-3 hover:bg-gray-50 flex items-center gap-4 cursor-pointer transition-colors border-b border-gray-50 last:border-0 group/item"
                                                 >
                                                     <div className="w-10 h-10 rounded-lg overflow-hidden bg-gray-100 shrink-0 border border-black/5 shadow-sm">
-                                                        <img src={item.image} alt={item.name} className="w-full h-full object-cover transition-transform group-hover/item:scale-110" />
+                                                        <img src={item.image} alt={item.categoryName} className="w-full h-full object-cover transition-transform group-hover/item:scale-110" />
                                                     </div>
                                                     <div className="flex-1 min-w-0">
-                                                        <h4 className="text-[13px] font-medium text-black truncate mb-0.5">
-                                                            <HighlightText text={item.name} query={searchQuery} />
+                                                        <h4 className="text-[13px] font-bold text-gray-900 truncate mb-0.5">
+                                                            {item.parentName ? `${item.parentName}` : item.categoryName}
                                                         </h4>
-                                                        <p className="text-[10px] font-bold uppercase text-black/30">
-                                                            {item.categoryId?.name || 'Category'}
+                                                        <p className="text-[10px] font-semibold uppercase text-black/40">
+                                                            {item.parentName ? item.categoryName : 'All Products'}
                                                         </p>
                                                     </div>
                                                     <ChevronRight size={14} className="text-gray-300 group-hover/item:text-black group-hover/item:translate-x-1 transition-all" />
@@ -521,7 +570,7 @@ const Header = ({ variant = 'default', showCategoryBar = true }) => {
                                 {searchSuggestions.length > 0 && (
                                     <div className="absolute top-[calc(100%+8px)] left-0 w-full bg-white rounded-2xl shadow-2xl overflow-hidden z-[1010] border border-black/5 animate-fadeInUp">
                                         <div className="p-3 border-b border-black/5 flex items-center justify-between bg-gray-50/50">
-                                            <span className="text-[10px] font-bold uppercase text-black/40">Top results</span>
+                                            <span className="text-[10px] font-bold uppercase text-black/40">Suggested Categories</span>
                                             <span 
                                                 onClick={() => handleSearch({ key: 'Enter' })}
                                                 className="text-[10px] font-bold text-black uppercase hover:underline"
@@ -532,19 +581,19 @@ const Header = ({ variant = 'default', showCategoryBar = true }) => {
                                         <div className="max-h-[350px] overflow-y-auto">
                                             {searchSuggestions.map((item) => (
                                                 <div
-                                                    key={item.id}
+                                                    key={item.categoryId}
                                                     onClick={() => handleSuggestionClick(item)}
                                                     className="px-4 py-3 active:bg-gray-50 flex items-center gap-4 cursor-pointer transition-colors border-b border-gray-50 last:border-0 group/mobileItem"
                                                 >
                                                     <div className="w-9 h-9 rounded-lg overflow-hidden bg-gray-100 shrink-0 border border-black/5">
-                                                        <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                                                        <img src={item.image} alt={item.categoryName} className="w-full h-full object-cover" />
                                                     </div>
                                                     <div className="flex-1 min-w-0">
-                                                        <h4 className="text-[13px] font-medium text-black truncate">
-                                                            <HighlightText text={item.name} query={searchQuery} />
+                                                        <h4 className="text-[13px] font-bold text-gray-900 truncate">
+                                                            {item.parentName ? `${item.parentName}` : item.categoryName}
                                                         </h4>
-                                                        <p className="text-[10px] font-bold text-black/30 uppercase mt-0.5">
-                                                            {item.categoryId?.name}
+                                                        <p className="text-[10px] font-semibold text-black/40 uppercase mt-0.5">
+                                                            {item.parentName ? item.categoryName : 'All Products'}
                                                         </p>
                                                     </div>
                                                     <ChevronRight size={14} className="text-gray-300" />

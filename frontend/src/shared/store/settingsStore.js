@@ -54,6 +54,7 @@ const defaultSettings = {
   orders: {
     cancellationTimeLimit: 24, // hours
     minimumOrderValue: 0,
+    platformFee: 20,
     orderTrackingEnabled: true,
     orderConfirmationEmail: true,
     orderStatuses: [

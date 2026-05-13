@@ -121,12 +121,15 @@ const ProductsPage = () => {
         const categoryToFetch = hasCid ? undefined : (category || undefined);
         const subCategoryToFetch = hasCid ? undefined : (selectedSubCategories.length > 0 ? selectedSubCategories[0] : (subCategoryFromUrl || undefined));
 
+        const searchFromUrlForFetch = searchParams.get('search') || searchParams.get('q') || undefined;
+
         fetchPublicProducts({
             ...(hasCid ? { categoryId: cidFromUrl } : {}),
             division: divisionToFetch,
             category: categoryToFetch,
             subCategory: subCategoryToFetch,
             brand: (selectedBrands.length > 0 ? selectedBrands[0] : undefined),
+            ...(searchFromUrlForFetch ? { q: searchFromUrlForFetch } : {}),
             sort: selectedSort === 'New Arrivals' ? 'newest' : 
                   selectedSort === 'Price: Low to High' ? 'price-asc' : 
                   selectedSort === 'Price: High to Low' ? 'price-desc' : 
@@ -149,7 +152,7 @@ const ProductsPage = () => {
 
             setFilterOptions(newOptions);
         }
-    }, [category, subCategoryFromUrl, cidFromUrl, division, selectedGender, selectedBrands, selectedSubCategories, selectedSort, fetchPublicProducts]);
+    }, [category, subCategoryFromUrl, cidFromUrl, division, selectedGender, selectedBrands, selectedSubCategories, selectedSort, fetchPublicProducts, searchParams]);
 
     // Derived subcategories based on gender
     const subCategories = useMemo(() => {

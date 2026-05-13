@@ -8,6 +8,7 @@ import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
 import { useUserLocation } from '../../context/LocationContext';
 import LocationModal from '../../components/Header/LocationModal';
+import { useSettingsStore } from '../../../../shared/store/settingsStore';
 import {
     ArrowLeft,
     ChevronRight,
@@ -40,6 +41,7 @@ const PaymentPage = () => {
     const { user } = useAuth();
     const { addresses, activeAddress, updateActiveAddress, refreshAddresses } = useUserLocation();
     const { createOrder } = useOrderStore();
+    const { settings } = useSettingsStore();
 
     // Get address from checkout navigation OR from context
     const passedAddress = location.state?.selectedAddress || null;
@@ -86,8 +88,13 @@ const PaymentPage = () => {
     }, 0);
 
     const totalDiscount = totalMRP - getCartTotal();
-    const platformFee = 20;
-    const shipping = typeof estimatedShipping === 'number' ? estimatedShipping : (getCartTotal() > 500 ? 0 : 40);
+    
+    // Dynamic values from settings
+    const shippingThreshold = settings?.shipping?.freeShippingThreshold || 500;
+    const defaultShippingRate = settings?.shipping?.defaultShippingRate || 40;
+    const platformFee = settings?.orders?.platformFee || 20;
+
+    const shipping = typeof estimatedShipping === 'number' ? estimatedShipping : (getCartTotal() > shippingThreshold ? 0 : defaultShippingRate);
 
     const subtotal = getCartTotal();
     let promoDiscount = 0;
