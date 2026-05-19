@@ -128,16 +128,25 @@ const ProductDetailsPage = () => {
         return finalPrice;
     }, [product, selectedSize]);
 
+    const getSizeStock = (size) => {
+        if (!product) return 0;
+        if (product.variants?.stockMap) {
+            const keys = [
+                `${String(size || "").toLowerCase()}|`,
+                `${String(size || "")}|`
+            ];
+            for (const k of keys) {
+                const variantStock = product.variants.stockMap[k];
+                if (variantStock !== undefined) return Number(variantStock);
+            }
+        }
+        return Number(product.stockQuantity || 0);
+    };
+
     const currentStock = useMemo(() => {
         if (!product) return 0;
-        // Check variant-specific stock if size is selected
-        if (selectedSize && product.variants?.stockMap) {
-            const variantKey = `${selectedSize}|`;
-            const variantStock = product.variants.stockMap[variantKey];
-            if (variantStock !== undefined) return Number(variantStock);
-        }
-        // Fallback to overall stock quantity
-        return Number(product.stockQuantity || 0);
+        if (!selectedSize) return Number(product.stockQuantity || 0);
+        return getSizeStock(selectedSize);
     }, [product, selectedSize]);
 
     const isOutOfStock = useMemo(() => {
@@ -455,28 +464,47 @@ const ProductDetailsPage = () => {
                                     </button>
                                 </div>
                                 <div className="flex flex-wrap gap-2 md:gap-2.5">
-                                    {sizes.map((size) => (
-                                        <button
-                                            key={size}
-                                            onClick={() => setSelectedSize(size)}
-                                            className={`min-w-[42px] h-11 md:min-w-[64px] md:h-14 rounded-xl md:rounded-2xl flex items-center justify-center font-bold text-[12px] md:text-[14px] transition-all relative ${selectedSize === size
-                                                ? 'bg-black text-white shadow-[0_0_15px_rgba(0,0,0,0.15)] scale-105'
-                                                : 'bg-gray-50 border border-gray-200 text-gray-900 hover:border-black'
+                                    {sizes.map((size) => {
+                                        const isSizeOutOfStock = getSizeStock(size) <= 0;
+                                        return (
+                                            <button
+                                                key={size}
+                                                onClick={() => setSelectedSize(size)}
+                                                className={`min-w-[42px] h-11 md:min-w-[64px] md:h-14 rounded-xl md:rounded-2xl flex flex-col items-center justify-center font-bold transition-all relative ${
+                                                    selectedSize === size
+                                                        ? 'bg-black text-white shadow-[0_0_15px_rgba(0,0,0,0.15)] scale-105'
+                                                        : isSizeOutOfStock
+                                                            ? 'bg-gray-50/50 border border-dashed border-gray-200 text-gray-400'
+                                                            : 'bg-gray-50 border border-gray-200 text-gray-900 hover:border-black'
                                                 }`}
-                                        >
-                                            {size}
-                                            {selectedSize === size && (
-                                                <div className="absolute -top-1 -right-1 bg-white text-black rounded-full p-0.5 border-2 border-[#111111]">
-                                                    <Check size={8} md:size={10} strokeWidth={4} />
-                                                </div>
-                                            )}
-                                        </button>
-                                    ))}
+                                            >
+                                                <span className={isSizeOutOfStock ? 'line-through text-gray-400' : ''}>
+                                                    {size}
+                                                </span>
+                                                {isSizeOutOfStock && (
+                                                    <span className={`text-[7px] md:text-[9px] font-black uppercase mt-0.5 ${selectedSize === size ? 'text-white/80' : 'text-red-500'}`}>
+                                                        Out
+                                                    </span>
+                                                )}
+                                                {selectedSize === size && !isSizeOutOfStock && (
+                                                    <div className="absolute -top-1 -right-1 bg-white text-black rounded-full p-0.5 border-2 border-[#111111]">
+                                                        <Check size={8} md:size={10} strokeWidth={4} />
+                                                    </div>
+                                                )}
+                                            </button>
+                                        );
+                                    })}
                                 </div>
                                 {selectedSize && (
-                                    <p className="mt-3 text-[11px] md:text-[13px] font-bold text-emerald-600 flex items-center gap-1.5 animate-fadeIn">
-                                        <ShieldCheck size={14} /> Fast shipping for size {selectedSize}
-                                    </p>
+                                    getSizeStock(selectedSize) <= 0 ? (
+                                        <p className="mt-3 text-[11px] md:text-[13px] font-bold text-red-500 flex items-center gap-1.5 animate-fadeIn">
+                                            <Info size={14} className="text-red-500" /> Sold Out - Size {selectedSize} is currently unavailable
+                                        </p>
+                                    ) : (
+                                        <p className="mt-3 text-[11px] md:text-[13px] font-bold text-emerald-600 flex items-center gap-1.5 animate-fadeIn">
+                                            <ShieldCheck size={14} /> Fast shipping for size {selectedSize}
+                                        </p>
+                                    )
                                 )}
                             </div>
                         )}
@@ -498,7 +526,12 @@ const ProductDetailsPage = () => {
                                     disabled
                                     className="flex-[3] h-12 md:h-14 bg-gray-200 text-gray-400 rounded-xl md:rounded-[18px] font-bold text-[11px] md:text-[13px] flex items-center justify-center shadow-inner cursor-not-allowed uppercase"
                                 >
-                                    {isVendorOffline ? "Store Offline" : "Currently unavailable"}
+                                    {isVendorOffline 
+                                        ? "Store Offline" 
+                                        : (selectedSize && getSizeStock(selectedSize) <= 0)
+                                            ? "Sold Out"
+                                            : "Currently unavailable"
+                                    }
                                 </button>
                             ) : (
                                 <button

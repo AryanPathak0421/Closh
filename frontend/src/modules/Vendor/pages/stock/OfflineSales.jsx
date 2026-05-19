@@ -789,7 +789,11 @@ const OfflineSales = () => {
     {
       key: "approvalStatus",
       label: "APPROVAL",
-      render: (value) => <Badge variant="success" className="text-[8px] py-0 px-1.5 uppercase">Approved</Badge>,
+      render: (value) => (
+        <Badge variant={value || 'pending'} className="text-[8px] py-0 px-1.5 uppercase">
+          {value || 'pending'}
+        </Badge>
+      ),
     },
     {
       key: "stockStatus",
@@ -951,7 +955,7 @@ const OfflineSales = () => {
                 {/* Actions Row */}
                 <div className="flex items-center justify-between pt-4 border-t border-emerald-50 shadow-[0_-5px_10px_-5px_rgba(0,0,0,0.02)]">
                    <div className="flex gap-1.5">
-                      <Badge variant="success" className="text-[8px] py-1 px-2.5">APPROVED</Badge>
+                      <Badge variant={sale.approvalStatus || 'pending'} className="text-[8px] py-1 px-2.5 uppercase">{sale.approvalStatus || 'pending'}</Badge>
                    </div>
                    <div className="flex items-center gap-5">
                       <button onClick={() => handleOpenModal(sale)} className="text-emerald-500 hover:text-emerald-700 transition-transform active:scale-90 p-2 bg-emerald-50 rounded-xl">
@@ -1356,17 +1360,32 @@ const OfflineSales = () => {
                     <div className="flex flex-wrap gap-2">
                       {(saleProduct.variants?.attributes?.find(a => a.name.toLowerCase() === 'size')?.values || saleProduct.sizes).map(size => {
                         const sizeAttrName = saleProduct.variants?.attributes?.find(a => a.name.toLowerCase() === 'size')?.name || 'Size';
+                        const tempSelection = { ...saleSelection, [sizeAttrName]: size };
+                        const stockForThisSize = getSelectedVariantStock(saleProduct, tempSelection);
+                        const isOutOfStock = stockForThisSize <= 0;
+                        const isSelected = saleSelection[sizeAttrName] === size;
                         return (
                           <button
                             key={size}
                             onClick={() => setSaleSelection({...saleSelection, [sizeAttrName]: size})}
-                            className={`px-4 py-2 rounded-xl text-xs font-black transition-all border-2 ${
-                              saleSelection[sizeAttrName] === size 
+                            className={`relative px-4 py-2.5 rounded-xl text-xs font-black transition-all border-2 overflow-hidden ${
+                              isSelected 
                               ? 'bg-[#003d29] text-white border-[#003d29] shadow-lg shadow-emerald-900/20' 
-                              : 'bg-white text-gray-600 border-gray-100 hover:border-emerald-200'
+                              : isOutOfStock
+                                ? 'bg-red-50/30 text-red-500 border-red-100 hover:border-red-200 hover:bg-red-50/50 shadow-sm shadow-red-100/10'
+                                : 'bg-white text-gray-600 border-gray-100 hover:border-emerald-200'
                             }`}
                           >
-                            {size}
+                            <span className={isOutOfStock && !isSelected ? "line-through decoration-red-400 decoration-2" : ""}>
+                              {size}
+                            </span>
+                            {isOutOfStock && (
+                              <span className={`absolute top-0 right-0 text-[7px] px-1 font-black rounded-bl uppercase ${
+                                isSelected ? 'bg-red-500 text-white' : 'bg-red-100 text-red-600'
+                              }`}>
+                                Out
+                              </span>
+                            )}
                           </button>
                         );
                       })}
@@ -1381,19 +1400,36 @@ const OfflineSales = () => {
                       <div className="size-1.5 rounded-full bg-emerald-500"></div> Select {attr.name}
                     </label>
                     <div className="flex flex-wrap gap-2">
-                      {attr.values.map(val => (
-                        <button
-                          key={val}
-                          onClick={() => setSaleSelection({...saleSelection, [attr.name]: val})}
-                          className={`px-4 py-2 rounded-xl text-xs font-black transition-all border-2 ${
-                            saleSelection[attr.name] === val
-                            ? 'bg-[#003d29] text-white border-[#003d29] shadow-lg shadow-emerald-900/20'
-                            : 'bg-white text-gray-600 border-gray-100 hover:border-emerald-200'
-                          }`}
-                        >
-                          {val}
-                        </button>
-                      ))}
+                      {attr.values.map(val => {
+                        const tempSelection = { ...saleSelection, [attr.name]: val };
+                        const stockForThisVal = getSelectedVariantStock(saleProduct, tempSelection);
+                        const isOutOfStock = stockForThisVal <= 0;
+                        const isSelected = saleSelection[attr.name] === val;
+                        return (
+                          <button
+                            key={val}
+                            onClick={() => setSaleSelection({...saleSelection, [attr.name]: val})}
+                            className={`relative px-4 py-2.5 rounded-xl text-xs font-black transition-all border-2 overflow-hidden ${
+                              isSelected
+                              ? 'bg-[#003d29] text-white border-[#003d29] shadow-lg shadow-emerald-900/20'
+                              : isOutOfStock
+                                ? 'bg-red-50/30 text-red-500 border-red-100 hover:border-red-200 hover:bg-red-50/50 shadow-sm shadow-red-100/10'
+                                : 'bg-white text-gray-600 border-gray-100 hover:border-emerald-200'
+                            }`}
+                          >
+                            <span className={isOutOfStock && !isSelected ? "line-through decoration-red-400 decoration-2" : ""}>
+                              {val}
+                            </span>
+                            {isOutOfStock && (
+                              <span className={`absolute top-0 right-0 text-[7px] px-1 font-black rounded-bl uppercase ${
+                                isSelected ? 'bg-red-500 text-white' : 'bg-red-100 text-red-600'
+                              }`}>
+                                Out
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 ))}

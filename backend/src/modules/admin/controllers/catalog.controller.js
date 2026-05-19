@@ -404,6 +404,10 @@ export const updateProductStatus = asyncHandler(async (req, res) => {
     if (approvalStatus === 'approved') {
         payload.isActive = true;
         payload.isVisible = true;
+        const existingProduct = await Product.findById(req.params.id).select('price vendorPrice').lean();
+        if (existingProduct && (!existingProduct.price || existingProduct.price === 0)) {
+            payload.price = existingProduct.vendorPrice || 0;
+        }
     } else {
         payload.isActive = false;
         payload.isVisible = false;

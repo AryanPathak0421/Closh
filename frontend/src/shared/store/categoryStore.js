@@ -11,6 +11,8 @@ import {
 } from '../../modules/Admin/services/adminService';
 import toast from 'react-hot-toast';
 
+let hasFetchedCategories = false;
+
 export const useCategoryStore = create(
   persist(
     (set, get) => ({
@@ -21,9 +23,10 @@ export const useCategoryStore = create(
       initialize: async (force = false) => {
         const state = get();
         // Guard: Don't initialize if already loading
-        // If categories already exist, only re-fetch if forced or if it's the first initialization this session
         if (state.isLoading) return;
-        if (!force && state.categories.length > 0) return;
+        
+        // If already fetched in this session/page load, rely on the cache unless forced
+        if (!force && hasFetchedCategories && state.categories.length > 0) return;
 
         set({ isLoading: true });
         try {
@@ -54,6 +57,7 @@ export const useCategoryStore = create(
             };
           });
           set({ categories: normalizedCategories, isLoading: false });
+          hasFetchedCategories = true;
         } catch (error) {
           set({ isLoading: false });
         }

@@ -98,6 +98,34 @@ const resolveVariantSelection = (product, selectedVariant) => {
     return { price: basePrice, variantKey: null, hasVariantAxes };
 };
 
+const resolveVariantKeyFromKeys = (keys = [], variant = {}) => {
+    if (!keys || !keys.length) return null;
+
+    const size = normalizeVariantPart(variant?.size || variant?.Size || '');
+    const color = normalizeVariantPart(variant?.color || variant?.Color || '');
+    if (!size && !color) return null;
+
+    const candidates = [
+        [size && `size=${size}`, color && `color=${color}`].filter(Boolean).sort().join('|'),
+        `${size}|${color}`,
+        `${size}|`,
+        `|${color}`,
+        `${size}-${color}`,
+        `${size}_${color}`,
+        `${size}:${color}`,
+        size && !color ? size : null,
+        color && !size ? color : null,
+    ].filter(Boolean);
+
+    for (const candidate of candidates) {
+        const exact = keys.find((key) => key === candidate);
+        if (exact) return exact;
+        const normalized = keys.find((key) => normalizeVariantPart(key) === normalizeVariantPart(candidate));
+        if (normalized) return normalized;
+    }
+    return null;
+};
+
 const resolveOrderItemVariantKey = (product, orderItem) => {
     const explicitKey = String(orderItem?.variantKey || '').trim();
     if (explicitKey) return explicitKey;
@@ -123,29 +151,7 @@ const resolveOrderItemVariantKey = (product, orderItem) => {
         if (normalizedDynamic) return normalizedDynamic;
     }
 
-    const size = normalizeVariantPart(orderItem?.variant?.size);
-    const color = normalizeVariantPart(orderItem?.variant?.color);
-    if (!size && !color) return null;
-
-    const candidates = [
-        [size && `size=${size}`, color && `color=${color}`].filter(Boolean).sort().join('|'),
-        `${size}|${color}`,
-        `${size}|`,
-        `|${color}`,
-        `${size}-${color}`,
-        `${size}_${color}`,
-        `${size}:${color}`,
-        size && !color ? size : null,
-        color && !size ? color : null,
-    ].filter(Boolean);
-
-    for (const candidate of candidates) {
-        const exact = existingKeys.find((key) => key === candidate);
-        if (exact) return exact;
-        const normalized = existingKeys.find((key) => normalizeVariantPart(key) === normalizeVariantPart(candidate));
-        if (normalized) return normalized;
-    }
-    return null;
+    return resolveVariantKeyFromKeys(existingKeys, orderItem?.variant);
 };
 
 // POST /api/user/orders
@@ -248,8 +254,17 @@ export const placeOrder = asyncHandler(async (req, res) => {
             throw new ApiError(400, `Please select a valid variant for ${product.name}.`);
         }
 
-        const rawVariantStock = variantKey ? (product?.variants?.stockMap?.get?.(variantKey) ?? product?.variants?.stockMap?.[variantKey]) : null;
-        const variantStockValue = variantKey ? Number(rawVariantStock ?? 0) : null;
+        let variantStockValue = null;
+        let stockKeyInMap = variantKey;
+        if (hasVariantAxes && variantKey) {
+            const stockKeys = toVariantStockEntries(product?.variants?.stockMap).map(([k]) => String(k).trim());
+            const resolvedStockKey = resolveVariantKeyFromKeys(stockKeys, item.variant);
+            if (resolvedStockKey) {
+                stockKeyInMap = resolvedStockKey;
+            }
+            const rawVariantStock = product?.variants?.stockMap?.get?.(stockKeyInMap) ?? product?.variants?.stockMap?.[stockKeyInMap];
+            variantStockValue = Number(rawVariantStock ?? 0);
+        }
 
         if (hasVariantAxes && variantKey && variantStockValue < item.quantity) {
             throw new ApiError(400, `Only ${variantStockValue || 0} units available for variant [${variantKey}] of ${product.name}. Please check stock in variants section.`);
@@ -259,7 +274,11 @@ export const placeOrder = asyncHandler(async (req, res) => {
 
         const variantImage =
             variantKey
-                ? String((product?.variants?.imageMap?.get?.(variantKey) ?? product?.variants?.imageMap?.[variantKey]) || '').trim()
+                ? String(
+                    (product?.variants?.imageMap?.get?.(variantKey) ?? product?.variants?.imageMap?.[variantKey]) || 
+                    (stockKeyInMap ? (product?.variants?.imageMap?.get?.(stockKeyInMap) ?? product?.variants?.imageMap?.[stockKeyInMap]) : '') || 
+                    ''
+                  ).trim()
                 : '';
         const itemCommissionRate = product.vendorId.commissionRate || 0;
         const itemVendorPrice = product.vendorPrice || 0;
@@ -279,7 +298,7 @@ export const placeOrder = asyncHandler(async (req, res) => {
             commissionAmount: itemCommissionAmount,
             marginAmount: itemMarginAmount,
             variant: item.variant,
-            variantKey: variantKey || undefined,
+            variantKey: stockKeyInMap || variantKey || undefined,
         };
         enrichedItems.push(enriched);
 

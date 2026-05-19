@@ -3,6 +3,8 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { getAllBrands, getPublicBrands, createBrand, updateBrand, deleteBrand } from '../../modules/Admin/services/adminService';
 import toast from 'react-hot-toast';
 
+let hasFetchedBrands = false;
+
 export const useBrandStore = create(
   persist(
     (set, get) => ({
@@ -10,10 +12,13 @@ export const useBrandStore = create(
       isLoading: false,
 
       // Initialize brands
-      initialize: async () => {
-        // Guard: Don't initialize if already loading or already have data
+      initialize: async (force = false) => {
+        // Guard: Don't initialize if already loading
         const state = get();
-        if (state.isLoading || state.brands.length > 0) return;
+        if (state.isLoading) return;
+
+        // If already fetched in this session/page load, rely on the cache unless forced
+        if (!force && hasFetchedBrands && state.brands.length > 0) return;
 
         set({ isLoading: true });
         try {
@@ -28,6 +33,7 @@ export const useBrandStore = create(
             id: brand._id // Ensure UI compatibility by aliasing _id to id
           }));
           set({ brands: normalizedBrands, isLoading: false });
+          hasFetchedBrands = true;
         } catch (error) {
           set({ isLoading: false });
           // Error toast is handled in api.js interceptor

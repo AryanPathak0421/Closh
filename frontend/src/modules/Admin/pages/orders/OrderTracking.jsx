@@ -162,16 +162,20 @@ const OrderTracking = () => {
       key: "id",
       label: "Order ID",
       sortable: true,
-      render: (value) => <span className="font-semibold">{value}</span>,
+      render: (value) => (
+        <span className="font-semibold text-xs sm:text-sm text-gray-800 break-all select-all">
+          {value}
+        </span>
+      ),
     },
     {
       key: "customer",
       label: "Customer",
       sortable: true,
       render: (value) => (
-        <div>
-          <p className="font-medium text-gray-800">{value.name}</p>
-          <p className="text-xs text-gray-500">{value.email}</p>
+        <div className="max-w-[120px] sm:max-w-none">
+          <p className="font-semibold text-xs sm:text-sm text-gray-800 truncate">{value.name}</p>
+          <p className="text-[10px] sm:text-xs text-gray-500 truncate">{value.email}</p>
         </div>
       ),
     },
@@ -179,13 +183,27 @@ const OrderTracking = () => {
       key: "status",
       label: "Status",
       sortable: true,
-      render: (value) => <Badge variant={value}>{value}</Badge>,
+      render: (value) => (
+        <div className="scale-90 sm:scale-100 origin-left">
+          <Badge variant={value}>{value}</Badge>
+        </div>
+      ),
     },
     {
       key: "date",
       label: "Order Date",
       sortable: true,
-      render: (value) => new Date(value).toLocaleString(),
+      render: (value) => {
+        const d = new Date(value);
+        const dateStr = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+        const timeStr = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+        return (
+          <div className="text-xs sm:text-sm text-gray-600 whitespace-nowrap">
+            <p className="font-medium text-gray-700">{dateStr}</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">{timeStr}</p>
+          </div>
+        );
+      },
     },
     {
       key: "actions",
@@ -194,7 +212,7 @@ const OrderTracking = () => {
       render: (_, row) => (
         <button
           onClick={() => setSelectedOrder(row)}
-          className="px-3 py-1 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm font-semibold">
+          className="px-2.5 py-1 sm:px-3.5 sm:py-1.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-xs sm:text-sm font-semibold shadow-sm flex items-center justify-center gap-1">
           Track
         </button>
       ),
@@ -242,7 +260,7 @@ const OrderTracking = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+          <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-200">
             {isLoading ? (
               <div className="p-8 text-center text-gray-500">Loading orders...</div>
             ) : (
@@ -251,6 +269,8 @@ const OrderTracking = () => {
                 columns={columns}
                 pagination={true}
                 itemsPerPage={10}
+                minWidth="min-w-[600px]"
+                className="[&_td]:px-2 sm:[&_td]:px-3 [&_th]:px-2 sm:[&_th]:px-3 [&_td]:py-2 sm:[&_td]:py-3 [&_th]:py-2 sm:[&_th]:py-3"
               />
             )}
           </div>
