@@ -21,6 +21,12 @@ const OrderDetailsPage = () => {
     const [isSubmittingUpi, setIsSubmittingUpi] = useState(false);
     const cooldownRef = useRef(null);
 
+    // Try & Buy return state
+    const [selectedReturnItems, setSelectedReturnItems] = useState({});
+    const [showTryBuyReturnModal, setShowTryBuyReturnModal] = useState(false);
+    const [tryBuyReturnReason, setTryBuyReturnReason] = useState('');
+    const [isSubmittingTryReturn, setIsSubmittingTryReturn] = useState(false);
+
 
 
     const RETURN_REASONS = [
@@ -283,6 +289,63 @@ const OrderDetailsPage = () => {
         invoiceWindow.document.close();
     };
 
+    const isTryActive = order?.status === 'try_active';
+    const isTryAndBuy = order?.orderType === 'try_and_buy';
+    const isCheckAndBuy = order?.orderType === 'check_and_buy';
+    const isMultiVendorOrder = (order?.vendorItems?.length || 0) > 1;
+
+    const handleToggleReturnItem = (itemId) => {
+        setSelectedReturnItems(prev => ({
+            ...prev,
+            [itemId]: !prev[itemId],
+        }));
+    };
+
+    const handleTryBuyReturnSubmit = async () => {
+        const selectedIds = Object.entries(selectedReturnItems)
+            .filter(([, checked]) => checked)
+            .map(([id]) => id);
+
+        if (selectedIds.length === 0) {
+            toast.error('Please select at least one item to return');
+            return;
+        }
+        if (!tryBuyReturnReason) {
+            toast.error('Please select a reason for return');
+            return;
+        }
+
+        setIsSubmittingTryReturn(true);
+        try {
+            const items = (order.items || []).filter(item => {
+                const id = String(item.id || item.productId || item._id || '');
+                return selectedIds.includes(id);
+            }).map(item => ({
+                productId: String(item.id || item.productId || item._id),
+                name: item.name,
+                quantity: item.quantity,
+            }));
+
+            await useOrderStore.getState().requestTryBuyReturn(orderId, {
+                reason: tryBuyReturnReason,
+                items,
+            });
+
+            const updatedOrder = await fetchOrderById(orderId, true);
+            if (updatedOrder) setOrder(updatedOrder);
+
+            setShowTryBuyReturnModal(false);
+            setSelectedReturnItems({});
+            setTryBuyReturnReason('');
+            toast.success('Try & Buy return request submitted! The same delivery partner will pick up your items.');
+        } catch (error) {
+            console.error('Try & Buy return failed:', error);
+            toast.error(error?.response?.data?.message || error?.message || 'Failed to submit return request');
+        } finally {
+            setIsSubmittingTryReturn(false);
+        }
+    };
+
     const handleReturnSubmit = async () => {
         if (!returnReason) {
             toast.error('Please select a reason for return');
@@ -390,14 +453,58 @@ const OrderDetailsPage = () => {
                 </div>
 
                 <div className="space-y-3 md:space-y-6">
+                    {/* Multi-vendor Check & Buy Policy Banner */}
+                    {isCheckAndBuy && isMultiVendorOrder && (
+                        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
+                            <AlertTriangle size={16} className="text-amber-500 shrink-0 mt-0.5" />
+                            <div>
+                                <p className="text-[11px] font-black text-amber-800 uppercase tracking-wide">Return Policy Notice</p>
+                                <p className="text-[10px] font-medium text-amber-700 leading-relaxed mt-0.5">
+                                    Check &amp; Buy return is supported only for single-vendor orders. This order contains items from multiple vendors and is not eligible for returns.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Try & Buy Active Banner */}
+                    {isTryActive && isTryAndBuy && (
+                        <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 flex items-start gap-3">
+                            <ShieldCheck size={16} className="text-indigo-500 shrink-0 mt-0.5" />
+                            <div className="flex-1">
+                                <p className="text-[11px] font-black text-indigo-800 uppercase tracking-wide">Try Session Active</p>
+                                <p className="text-[10px] font-medium text-indigo-700 leading-relaxed mt-0.5">
+                                    Select items below to return. The same delivery partner will pick them up.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Items Section */}
                     <div className="bg-white rounded-2xl border border-gray-100 p-3 md:p-6 shadow-sm font-bold">
                         <h3 className="text-[10px] md:text-sm font-bold uppercase mb-3 flex items-center gap-2 text-gray-400">
                             <Package size={14} /> Items in Order
+                            {isTryActive && isTryAndBuy && (
+                                <span className="ml-auto text-[9px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
+                                    SELECT TO RETURN
+                                </span>
+                            )}
                         </h3>
                         <div className="space-y-3">
-                            {order.items.map((item, idx) => (
-                                <div key={idx} className="flex gap-3 border-b border-gray-50 last:border-0 pb-3 last:pb-0">
+                            {order.items.map((item, idx) => {
+                                const itemId = String(item.id || item.productId || item._id || idx);
+                                const isSelected = !!selectedReturnItems[itemId];
+                                return (
+                                <div key={idx}
+                                    className={`flex gap-3 border-b border-gray-50 last:border-0 pb-3 last:pb-0 rounded-xl transition-all ${isTryActive && isTryAndBuy ? (isSelected ? 'bg-indigo-50/70 px-2 -mx-1 border-indigo-100' : 'cursor-pointer hover:bg-gray-50 px-2 -mx-1') : ''}`}
+                                    onClick={() => { if (isTryActive && isTryAndBuy) handleToggleReturnItem(itemId); }}
+                                >
+                                    {isTryActive && isTryAndBuy && (
+                                        <div className="flex items-center shrink-0">
+                                            <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'border-gray-300'}`}>
+                                                {isSelected && <CheckCircle size={12} className="text-white" />}
+                                            </div>
+                                        </div>
+                                    )}
                                     <div className="w-14 h-18 md:w-20 md:h-24 bg-white rounded-lg overflow-hidden shrink-0 border border-gray-100">
                                         <img src={item.image} alt="" className="w-full h-full object-cover" />
                                     </div>
@@ -422,8 +529,22 @@ const OrderDetailsPage = () => {
                                         <p className="text-[12px] md:text-base font-bold text-black mt-1">₹{item.discountedPrice || item.price}</p>
                                     </div>
                                 </div>
-                            ))}
+                                );
+                            })}
                         </div>
+
+                        {/* Return Selected Products Floating Action */}
+                        {isTryActive && isTryAndBuy && Object.values(selectedReturnItems).some(Boolean) && (
+                            <div className="mt-4 pt-3 border-t border-gray-100">
+                                <button
+                                    onClick={() => setShowTryBuyReturnModal(true)}
+                                    className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold text-[11px] uppercase hover:bg-indigo-700 transition-all active:scale-95 flex items-center justify-center gap-2 shadow-lg shadow-indigo-200"
+                                >
+                                    <RefreshCcw size={14} />
+                                    Return {Object.values(selectedReturnItems).filter(Boolean).length} Selected Item(s)
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                     {/* Delivery & Payment Info Grid */}
@@ -1158,6 +1279,76 @@ const OrderDetailsPage = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Try & Buy Return Modal */}
+            {showTryBuyReturnModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                    <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+                        <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-indigo-100 text-indigo-600 rounded-xl">
+                                    <RefreshCcw size={20} />
+                                </div>
+                                <div>
+                                    <h3 className="text-base font-bold uppercase">Return Selected Items</h3>
+                                    <p className="text-[10px] text-gray-400 font-bold">{Object.values(selectedReturnItems).filter(Boolean).length} item(s) selected</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setShowTryBuyReturnModal(false)}
+                                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="p-6 space-y-4">
+                            <p className="text-sm font-bold text-gray-500">
+                                The original delivery partner will pick up the selected items from you.
+                            </p>
+
+                            <div className="space-y-2">
+                                {RETURN_REASONS.map((reason, idx) => (
+                                    <label
+                                        key={idx}
+                                        className={`flex items-center gap-3 p-3 rounded-2xl border-2 transition-all cursor-pointer ${tryBuyReturnReason === reason ? 'border-indigo-600 bg-indigo-50' : 'border-gray-100 hover:border-gray-200'}`}
+                                    >
+                                        <input
+                                            type="radio"
+                                            name="tryBuyReturnReason"
+                                            value={reason}
+                                            checked={tryBuyReturnReason === reason}
+                                            onChange={(e) => setTryBuyReturnReason(e.target.value)}
+                                            className="w-4 h-4 accent-indigo-600"
+                                        />
+                                        <span className="text-xs font-bold text-gray-700">{reason}</span>
+                                    </label>
+                                ))}
+                            </div>
+
+                            <div className="pt-4 flex gap-3">
+                                <button
+                                    onClick={() => setShowTryBuyReturnModal(false)}
+                                    className="flex-1 py-3 bg-gray-100 text-gray-600 rounded-xl font-bold text-[11px] uppercase hover:bg-gray-200 transition-all"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleTryBuyReturnSubmit}
+                                    disabled={!tryBuyReturnReason || isSubmittingTryReturn}
+                                    className={`flex-1 py-3 rounded-xl font-bold text-[11px] uppercase transition-all shadow-lg ${
+                                        !tryBuyReturnReason || isSubmittingTryReturn
+                                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                            : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-200'
+                                    }`}
+                                >
+                                    {isSubmittingTryReturn ? 'Submitting...' : 'Confirm Return'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Return Request Modal */}
             {showReturnModal && (

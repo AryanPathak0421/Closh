@@ -1812,3 +1812,146 @@ export const updateReturnStatus = asyncHandler(async (req, res) => {
 
     res.status(200).json(new ApiResponse(200, returnReq, 'Return status updated.'));
 });
+
+// POST /api/delivery/returns/:id/pickup-from-customer
+export const pickupReturnFromCustomer = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { otp, pickupPhoto } = req.body;
+    const deliveryBoyId = req.user.id;
+
+    if (!pickupPhoto) throw new ApiError(400, 'Pickup photo is required.');
+    
+    const returnReq = await ReturnRequest.findOne({ _id: id, deliveryBoyId });
+    if (!returnReq) throw new ApiError(404, 'Return request not found or not assigned to you.');
+
+    if (returnReq.status !== 'processing' && returnReq.status !== 'pending') {
+        throw new ApiError(400, `Cannot pick up return in status: ${returnReq.status}`);
+    }
+
+    // Verify OTP
+    const normalizedOtp = String(otp || '').trim();
+    const otpHash = DeliveryOtpService.hashOtp(normalizedOtp);
+    const isValidOtp = otpHash === returnReq.pickupOtpHash || (!IS_PRODUCTION && normalizedOtp === returnReq.pickupOtpDebug);
+    
+    if (!isValidOtp) throw new ApiError(400, 'Invalid Customer OTP for pickup.');
+
+    returnReq.status = 'processing';
+    returnReq.pickupPhoto = pickupPhoto;
+
+    // Generate drop-off OTPs for each vendor
+    if (returnReq.isMultiVendor) {
+        for (const dropoff of returnReq.vendorDropoffs) {
+            const vOtp = DeliveryOtpService.generateOtp();
+            dropoff.dropoffOtpHash = DeliveryOtpService.hashOtp(vOtp);
+            dropoff.dropoffOtpDebug = vOtp;
+            
+            await createNotification({
+                recipientId: dropoff.vendorId,
+                recipientType: 'vendor',
+                title: 'Return Drop-off OTP 🔐',
+                message: `The rider is bringing returned items. Your verification OTP is ${vOtp}.`,
+                type: 'order',
+                data: { returnId: String(returnReq._id), otp: vOtp }
+            });
+        }
+    } else {
+        const dOtp = DeliveryOtpService.generateOtp();
+        returnReq.deliveryOtpHash = DeliveryOtpService.hashOtp(dOtp);
+        returnReq.deliveryOtpExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        returnReq.deliveryOtpDebug = dOtp;
+        
+        await createNotification({
+            recipientId: returnReq.vendorId,
+            recipientType: 'vendor',
+            title: 'Return Drop-off OTP 🔐',
+            message: `The rider is bringing returned items. Your verification OTP is ${dOtp}.`,
+            type: 'order',
+            data: { returnId: String(returnReq._id), otp: dOtp }
+        });
+    }
+
+    await returnReq.save();
+
+    emitEvent(`user_${returnReq.userId}`, 'return_picked_up', { returnId: returnReq._id });
+    if (returnReq.isMultiVendor) {
+        returnReq.vendorDropoffs.forEach(v => {
+            emitEvent(`vendor_${v.vendorId}`, 'return_picked_up', { returnId: returnReq._id });
+        });
+    } else {
+        emitEvent(`vendor_${returnReq.vendorId}`, 'return_picked_up', { returnId: returnReq._id });
+    }
+
+    res.status(200).json(new ApiResponse(200, returnReq, 'Return items picked up from customer successfully.'));
+});
+
+// POST /api/delivery/returns/:id/dropoff-at-vendor
+export const dropoffReturnAtVendor = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { vendorId, otp, deliveryPhoto } = req.body;
+    const deliveryBoyId = req.user.id;
+
+    if (!deliveryPhoto) throw new ApiError(400, 'Dropoff photo is required.');
+    
+    const returnReq = await ReturnRequest.findOne({ _id: id, deliveryBoyId });
+    if (!returnReq) throw new ApiError(404, 'Return request not found or not assigned to you.');
+    
+    if (returnReq.status !== 'processing') {
+        throw new ApiError(400, `Cannot drop off in status: ${returnReq.status}`);
+    }
+
+    const normalizedOtp = String(otp || '').trim();
+    const otpHash = DeliveryOtpService.hashOtp(normalizedOtp);
+
+    if (returnReq.isMultiVendor) {
+        if (!vendorId) throw new ApiError(400, 'vendorId is required for multi-vendor return dropoffs.');
+        
+        const dropoff = returnReq.vendorDropoffs.find(d => String(d.vendorId) === vendorId);
+        if (!dropoff) throw new ApiError(404, 'Vendor not found in this return request.');
+        if (dropoff.status === 'dropped_off') throw new ApiError(400, 'Already dropped off at this vendor.');
+        
+        const isValidOtp = otpHash === dropoff.dropoffOtpHash || (!IS_PRODUCTION && normalizedOtp === dropoff.dropoffOtpDebug);
+        if (!isValidOtp) throw new ApiError(400, 'Invalid Vendor OTP.');
+
+        dropoff.status = 'dropped_off';
+        dropoff.proofPhoto = deliveryPhoto;
+        dropoff.droppedOffAt = new Date();
+        
+        // Check if all vendors are dropped off
+        const allDropped = returnReq.vendorDropoffs.every(d => d.status === 'dropped_off');
+        if (allDropped) {
+            returnReq.status = 'completed';
+            returnReq.isUpiRequested = true;
+        }
+    } else {
+        const isValidOtp = otpHash === returnReq.deliveryOtpHash || (!IS_PRODUCTION && normalizedOtp === returnReq.deliveryOtpDebug);
+        if (!isValidOtp) throw new ApiError(400, 'Invalid Vendor OTP.');
+
+        returnReq.deliveryPhoto = deliveryPhoto;
+        returnReq.status = 'completed';
+        returnReq.isUpiRequested = true;
+    }
+
+    await returnReq.save();
+
+    emitEvent(`vendor_${vendorId || returnReq.vendorId}`, 'return_dropped_off', { returnId: returnReq._id });
+
+    if (returnReq.status === 'completed') {
+        await WalletService.processOrderReturn(returnReq).catch(e => console.error(e));
+        const order = await Order.findById(returnReq.orderId);
+        if (order) {
+            order.status = 'returned';
+            await order.save();
+        }
+        await createNotification({
+            recipientId: returnReq.userId,
+            recipientType: 'user',
+            title: 'Submit UPI ID for Refund',
+            message: `Your return for order #${order?.orderId || returnReq.returnId} has reached the vendor(s). Please submit your UPI ID for refund.`,
+            type: 'return',
+            data: { returnId: String(returnReq._id) }
+        });
+        emitEvent(`user_${returnReq.userId}`, 'return_completed', { returnId: returnReq._id });
+    }
+
+    res.status(200).json(new ApiResponse(200, returnReq, 'Return dropped off successfully.'));
+});

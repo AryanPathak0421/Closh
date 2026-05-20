@@ -580,6 +580,26 @@ export const useDeliveryAuthStore = create(
         } catch (e) { set({ isUpdatingOrderStatus: false }); throw e; }
       },
 
+      pickupReturnFromCustomer: async (id, { otp, pickupPhoto }) => {
+        set({ isUpdatingOrderStatus: true });
+        try {
+          const res = await api.post(`/delivery/returns/${id}/pickup-from-customer`, { otp, pickupPhoto });
+          const ret = normalizeReturn(res.data?.data || res.data || res);
+          set({ isUpdatingOrderStatus: false });
+          return ret;
+        } catch (e) { set({ isUpdatingOrderStatus: false }); throw e; }
+      },
+
+      dropoffReturnAtVendor: async (id, { vendorId, otp, deliveryPhoto }) => {
+        set({ isUpdatingOrderStatus: true });
+        try {
+          const res = await api.post(`/delivery/returns/${id}/dropoff-at-vendor`, { vendorId, otp, deliveryPhoto });
+          const ret = normalizeReturn(res.data?.data || res.data || res);
+          set({ isUpdatingOrderStatus: false });
+          return ret;
+        } catch (e) { set({ isUpdatingOrderStatus: false }); throw e; }
+      },
+
       initialize: () => {
         const token = localStorage.getItem('delivery-token');
         if (token) {

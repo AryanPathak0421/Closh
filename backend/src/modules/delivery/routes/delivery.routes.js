@@ -97,6 +97,8 @@ router.get('/returns/available', ...deliveryAuth, orderController.getAvailableRe
 router.get('/returns/:id', ...deliveryAuth, orderController.getReturnDetail);
 router.post('/returns/:id/accept', ...deliveryAuth, orderController.acceptReturnAssignment);
 router.patch('/returns/:id/status', ...deliveryAuth, orderController.updateReturnStatus);
+router.post('/returns/:id/pickup-from-customer', ...deliveryAuth, orderController.pickupReturnFromCustomer);
+router.post('/returns/:id/dropoff-at-vendor', ...deliveryAuth, orderController.dropoffReturnAtVendor);
 
 // Notifications
 router.get('/notifications', ...deliveryAuth, notificationController.getDeliveryNotifications);

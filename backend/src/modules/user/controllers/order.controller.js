@@ -1077,3 +1077,123 @@ export const submitReturnUPI = asyncHandler(async (req, res) => {
     res.status(200).json(new ApiResponse(200, returnReq, 'UPI ID submitted successfully'));
 });
 
+/**
+ * @desc    Create Advanced Try & Buy / Check & Buy Return Request
+ * @route   POST /api/user/orders/:id/try-buy-returns
+ * @access  Private (Customer)
+ */
+export const createTryBuyReturnRequest = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { items, reason, images } = req.body;
+
+    const order = await Order.findOne({
+        $or: [{ _id: mongoose.isValidObjectId(id) ? id : null }, { orderId: id }],
+        userId: req.user.id,
+    });
+
+    if (!order) {
+        throw new ApiError(404, 'Order not found.');
+    }
+
+    if (!['try_and_buy', 'check_and_buy'].includes(order.orderType)) {
+        throw new ApiError(400, 'This endpoint only supports Try & Buy or Check & Buy orders.');
+    }
+
+    const isMultiVendor = order.isMultiVendor || (order.vendorItems && order.vendorItems.length > 1);
+
+    // Multi-vendor Check & Buy restriction
+    if (order.orderType === 'check_and_buy' && isMultiVendor) {
+        throw new ApiError(400, 'Return policy is currently not available for multi-vendor Check & Buy orders.');
+    }
+
+    // Try session active / valid status check
+    const validStatuses = ['delivered', 'try_active'];
+    if (!validStatuses.includes(String(order.status || '').toLowerCase())) {
+        throw new ApiError(400, 'Returns can only be requested during an active try session or after delivery.');
+    }
+
+    // Group requested items by vendor
+    const vendorDropoffsMap = {};
+    const processedItems = [];
+    let refundAmount = 0;
+
+    for (const inputItem of items) {
+        const vendorId = String(inputItem.vendorId);
+        const productId = String(inputItem.productId);
+
+        const vendorGroup = order.vendorItems?.find((v) => String(v.vendorId) === vendorId);
+        if (!vendorGroup) throw new ApiError(400, `Vendor ${vendorId} not found in this order.`);
+
+        const orderItem = vendorGroup.items.find((it) => String(it.productId) === productId);
+        if (!orderItem) throw new ApiError(400, `Product ${productId} not found in vendor ${vendorId}'s package.`);
+
+        const requestedQty = Number(inputItem.quantity);
+        if (requestedQty <= 0 || requestedQty > orderItem.quantity) {
+            throw new ApiError(400, `Invalid return quantity for product ${orderItem.name}.`);
+        }
+
+        const itemTotal = orderItem.price * requestedQty;
+        refundAmount += itemTotal;
+
+        const returnItemData = {
+            productId: orderItem.productId,
+            name: orderItem.name,
+            quantity: requestedQty,
+            reason: inputItem.reason || reason,
+        };
+
+        processedItems.push(returnItemData);
+
+        if (!vendorDropoffsMap[vendorId]) {
+            vendorDropoffsMap[vendorId] = {
+                vendorId: vendorGroup.vendorId,
+                vendorName: vendorGroup.vendorName,
+                shopLocation: undefined, // Need to fetch from Vendor or original pickup
+                shopAddress: '',
+                items: [],
+                status: 'pending'
+            };
+            
+            // Attempt to get location from original pickups
+            const origPickup = order.vendorPickups?.find(vp => String(vp.vendorId) === vendorId);
+            if (origPickup) {
+                vendorDropoffsMap[vendorId].shopLocation = origPickup.shopLocation;
+                vendorDropoffsMap[vendorId].shopAddress = origPickup.shopAddress;
+                vendorDropoffsMap[vendorId].vendorPhone = origPickup.vendorPhone;
+            } else {
+                // Fallback to fetching vendor model
+                const vendorData = await Vendor.findById(vendorId);
+                if (vendorData) {
+                    vendorDropoffsMap[vendorId].shopLocation = vendorData.shopLocation;
+                    vendorDropoffsMap[vendorId].shopAddress = vendorData.shopAddress;
+                    vendorDropoffsMap[vendorId].vendorPhone = vendorData.phone;
+                }
+            }
+        }
+        
+        vendorDropoffsMap[vendorId].items.push(returnItemData);
+    }
+
+    const vendorDropoffs = Object.values(vendorDropoffsMap);
+
+    const returnRequest = await ReturnRequest.create({
+        orderId: order._id,
+        returnId: generateReturnId(),
+        userId: req.user.id,
+        isMultiVendor: isMultiVendor,
+        vendorId: isMultiVendor ? null : vendorDropoffs[0]?.vendorId,
+        vendorDropoffs,
+        trySessionActive: order.status === 'try_active',
+        items: processedItems,
+        reason,
+        images: images || [],
+        status: 'pending',
+        refundAmount,
+        originalDeliveryBoyId: order.deliveryBoyId,
+        deliveryBoyId: order.deliveryBoyId, // Auto-assign to same delivery boy
+        pickupLocation: order.dropoffLocation, // Pick up from customer's dropoff location
+    });
+
+    res.status(201).json(new ApiResponse(201, returnRequest, 'Return request generated successfully.'));
+});
+

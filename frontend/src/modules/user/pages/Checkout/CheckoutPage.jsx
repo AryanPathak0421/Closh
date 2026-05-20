@@ -315,8 +315,10 @@ const CheckoutPage = () => {
 
                                     {/* Price */}
                                     <div className="flex items-baseline gap-2">
-                                        <span className="text-base font-bold text-black">₹{item.price}</span>
-                                        <span className="text-[11px] text-gray-400 line-through font-bold">₹{item.originalPrice}</span>
+                                        <span className="text-base font-bold text-black">₹{(Number(item.price) * item.quantity).toFixed(2)}</span>
+                                        {Number(item.originalPrice) > Number(item.price) && (
+                                            <span className="text-[11px] text-gray-400 line-through font-bold">₹{(Number(item.originalPrice) * item.quantity).toFixed(2)}</span>
+                                        )}
                                         <span className="text-[11px] font-bold text-[#F97316] uppercase er">
                                             {item.discount || (item.originalPrice > item.price ? `${Math.round(((item.originalPrice - item.price) / item.originalPrice) * 100)}% Off` : '')}
                                         </span>

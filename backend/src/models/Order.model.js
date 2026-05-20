@@ -170,6 +170,7 @@ const orderSchema = new mongoose.Schema(
                 'shipped',              // Shipped
                 'out_for_delivery',     // Rider out for delivery
                 'delivered',            // Order completed + user verified
+                'try_active',           // Try & Buy session active
                 'cancelled',            // Cancelled by any party or timeout
                 'return requested',     // Customer requested return
                 'returned'              // Order returned
