@@ -8,6 +8,8 @@ import Settings from '../../../models/Settings.model.js';
 import { emitEvent } from '../../../services/socket.service.js';
 import { slugify } from '../../../utils/slugify.js';
 import { clearCachePattern, deleteCache } from '../../../utils/cache.js';
+import fs from 'fs';
+import * as xlsx from 'xlsx';
 
 const sanitizeFaqs = (faqs) => {
     if (!Array.isArray(faqs)) return [];
@@ -641,3 +643,86 @@ export const deleteBrand = asyncHandler(async (req, res) => {
     await deleteCache('brands:all');
     res.status(200).json(new ApiResponse(200, null, 'Brand deleted.'));
 });
+
+// POST /api/admin/products/bulk-upload
+export const bulkUploadProducts = asyncHandler(async (req, res) => {
+    if (!req.file || !req.file.path) {
+        throw new ApiError(400, 'Please upload an Excel or CSV file.');
+    }
+
+    try {
+        const workbook = xlsx.readFile(req.file.path);
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        
+        // Convert to JSON
+        const rawData = xlsx.utils.sheet_to_json(worksheet);
+        
+        if (rawData.length === 0) {
+            throw new ApiError(400, 'The uploaded file is empty.');
+        }
+
+        const successRows = [];
+        const errorRows = [];
+
+        // Simple loop to insert
+        for (let i = 0; i < rawData.length; i++) {
+            const row = rawData[i];
+            try {
+                // Expected columns: name, price, description, category, stock, imageUrl
+                const name = row.name || row.Name;
+                const price = row.price || row.Price;
+                const description = row.description || row.Description || '';
+                const categoryName = row.category || row.Category;
+                const stock = row.stock || row.Stock;
+                const imageUrl = row.imageUrl || row.ImageUrl;
+                const stockQuantity = parseInt(row.stockQuantity || row.StockQuantity || 0, 10);
+
+                if (!name || !price) {
+                    throw new Error('Name and Price are required.');
+                }
+
+                let categoryId = null;
+                if (categoryName) {
+                    const category = await Category.findOne({ name: new RegExp('^' + categoryName + '$', 'i') });
+                    if (category) {
+                        categoryId = category._id;
+                    }
+                }
+
+                const slug = slugify(name) + '-' + Date.now() + '-' + i;
+                
+                const product = await Product.create({
+                    name,
+                    slug,
+                    price: Number(price),
+                    description,
+                    categoryId,
+                    stock: stock || 'in_stock',
+                    stockQuantity: Number.isNaN(stockQuantity) ? 0 : stockQuantity,
+                    images: imageUrl ? [imageUrl] : [],
+                    isActive: true,
+                    isVisible: true,
+                    approvalStatus: 'approved'
+                });
+                
+                successRows.push(product);
+            } catch (err) {
+                errorRows.push({ row: i + 2, error: err.message, data: row });
+            }
+        }
+        
+        await clearCachePattern('products:list:*');
+
+        return res.status(200).json(new ApiResponse(200, {
+            successCount: successRows.length,
+            errorCount: errorRows.length,
+            errors: errorRows
+        }, 'Bulk upload completed'));
+    } finally {
+        if (fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+        }
+    }
+});
+

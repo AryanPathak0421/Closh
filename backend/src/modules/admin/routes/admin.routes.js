@@ -121,6 +121,7 @@ router.get('/products', ...adminAuth, checkPermission('products_manage'), catalo
 router.get('/products/tax-pricing-rules', ...adminAuth, checkPermission('products_manage'), catalogController.getTaxPricingRules);
 router.get('/products/:id', ...adminAuth, checkPermission('products_manage'), catalogController.getProductById);
 router.post('/products', ...adminAuth, checkPermission('products_manage'), validate(createProductSchema), catalogController.createProduct);
+router.post('/products/bulk-upload', ...adminAuth, checkPermission('products_manage'), uploadSingle('file'), catalogController.bulkUploadProducts);
 router.put('/products/tax-pricing-rules', ...adminAuth, checkPermission('products_manage'), validate(taxPricingRulesSchema), catalogController.updateTaxPricingRules);
 
 router.put('/products/:id', ...adminAuth, checkPermission('products_manage'), validate(updateProductSchema), catalogController.updateProduct);

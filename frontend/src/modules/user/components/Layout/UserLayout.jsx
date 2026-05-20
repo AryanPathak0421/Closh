@@ -2,7 +2,7 @@ import { useLocation } from 'react-router-dom';
 import Header from '../../components/Header/Header';
 import Footer from '../../components/Footer/Footer';
 import BottomNav from '../../components/Navigation/BottomNav';
-
+import ChatbotWidget from '../ChatbotWidget';
 
 const UserLayout = ({ children, variant = 'default', showHeader = true, showCategoryBar = true }) => {
     const location = useLocation();
@@ -22,6 +22,7 @@ const UserLayout = ({ children, variant = 'default', showHeader = true, showCate
                 </div>
             </div>
             {displayBottomNav && <BottomNav />}
+            <ChatbotWidget />
         </div>
     );
 };

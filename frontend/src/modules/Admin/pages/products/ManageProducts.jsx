@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect } from "react";
-import { FiSearch, FiEdit, FiTrash2, FiPlus } from "react-icons/fi";
+import { useState, useMemo, useEffect, useRef } from "react";
+import { FiSearch, FiEdit, FiTrash2, FiPlus, FiUpload } from "react-icons/fi";
 import { motion } from "framer-motion";
 import DataTable from "../../components/DataTable";
 import ExportButton from "../../components/ExportButton";
@@ -11,7 +11,7 @@ import { formatPrice } from "../../../../shared/utils/helpers";
 
 import { useCategoryStore } from "../../../../shared/store/categoryStore";
 import { useBrandStore } from "../../../../shared/store/brandStore";
-import { getAllProducts, deleteProduct, getAllVendors, updateProductStatus } from "../../services/adminService";
+import { getAllProducts, deleteProduct, getAllVendors, updateProductStatus, bulkUploadProducts } from "../../services/adminService";
 import toast from "react-hot-toast";
 import { FiUser, FiCheckCircle, FiClock, FiXCircle, FiGrid } from "react-icons/fi";
 
@@ -37,6 +37,8 @@ const ManageProducts = () => {
   const [explorerVendorId, setExplorerVendorId] = useState(null);
   const [explorerStatus, setExplorerStatus] = useState("all");
   const [vendorSearchQuery, setVendorSearchQuery] = useState("");
+  const fileInputRef = useRef(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     initCategories();
@@ -292,6 +294,24 @@ const ManageProducts = () => {
     }
   };
 
+  const handleBulkUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      const response = await bulkUploadProducts(file);
+      const { successCount, errorCount } = response.data;
+      toast.success(`Upload complete: ${successCount} added, ${errorCount} failed.`);
+      loadProducts();
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to upload bulk products");
+    } finally {
+      setIsUploading(false);
+      event.target.value = null; // reset input
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -308,13 +328,30 @@ const ManageProducts = () => {
             Manage your global catalog and vendor submissions.
           </p>
         </div>
-        <button
-          onClick={() => setProductFormModal({ isOpen: true, productId: "new" })}
-          className="flex items-center gap-2 px-5 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-all shadow-md hover:shadow-lg active:scale-95 text-sm font-bold"
-        >
-          <FiPlus />
-          Add Global Product
-        </button>
+        <div className="flex gap-2">
+          <input 
+            type="file" 
+            accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" 
+            className="hidden" 
+            ref={fileInputRef} 
+            onChange={handleBulkUpload} 
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+            className="flex items-center gap-2 px-5 py-2.5 bg-gray-600 text-white rounded-xl hover:bg-gray-700 transition-all shadow-md hover:shadow-lg active:scale-95 text-sm font-bold disabled:opacity-50"
+          >
+            <FiUpload />
+            {isUploading ? "Uploading..." : "Bulk Upload"}
+          </button>
+          <button
+            onClick={() => setProductFormModal({ isOpen: true, productId: "new" })}
+            className="flex items-center gap-2 px-5 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-all shadow-md hover:shadow-lg active:scale-95 text-sm font-bold"
+          >
+            <FiPlus />
+            Add Global Product
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">

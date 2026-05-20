@@ -81,6 +81,16 @@ export const createProduct = (data) =>
 export const updateProduct = (id, data) =>
     api.put(`/admin/products/${id}`, data);
 
+export const bulkUploadProducts = (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/admin/products/bulk-upload', formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data',
+        },
+    });
+};
+
 export const deleteProduct = (id) =>
     api.delete(`/admin/products/${id}`);
 

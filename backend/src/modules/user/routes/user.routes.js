@@ -6,7 +6,8 @@ import * as reviewController from '../controllers/review.controller.js';
 import * as orderController from '../controllers/order.controller.js';
 import * as notificationController from '../controllers/notification.controller.js';
 import * as supportController from '../controllers/support.controller.js';
-import { authenticate } from '../../../middlewares/authenticate.js';
+import * as chatbotController from '../controllers/chatbot.controller.js';
+import { authenticate, optionalAuth } from '../../../middlewares/authenticate.js';
 import { authorize, enforceAccountStatus } from '../../../middlewares/authorize.js';
 import { authLimiter, otpLimiter } from '../../../middlewares/rateLimiter.js';
 import { validate } from '../../../middlewares/validate.js';
@@ -98,5 +99,8 @@ router.get('/support/tickets', ...customerAuth, supportController.getUserTickets
 router.get('/support/tickets/:id', ...customerAuth, supportController.getUserTicketById);
 router.post('/support/tickets', ...customerAuth, supportController.createSupportTicket);
 router.post('/support/tickets/:id/messages', ...customerAuth, supportController.addUserTicketMessage);
+
+// Chatbot routes
+router.post('/chatbot/message', optionalAuth, chatbotController.handleChatMessage);
 
 export default router;
