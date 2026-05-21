@@ -3,18 +3,18 @@
 const getApiBaseUrl = () => {
     const envUrl = import.meta.env.VITE_API_BASE_URL;
     const hostname = window.location.hostname;
-    const isProduction = hostname.includes('closh.in') || hostname.includes('vercel.app');
+    const isProduction = hostname.includes('closh.in') || hostname.includes('vercel.app') || hostname.includes('onrender.com');
     
-    if (isProduction) return 'https://api.closh.in/api';
+    if (isProduction) return 'https://closh.onrender.com/api';
     return envUrl || 'http://localhost:5000/api';
 };
 
 const getImageUrlBase = () => {
     const envUrl = import.meta.env.VITE_IMAGE_BASE_URL;
     const hostname = window.location.hostname;
-    const isProduction = hostname.includes('closh.in') || hostname.includes('vercel.app');
+    const isProduction = hostname.includes('closh.in') || hostname.includes('vercel.app') || hostname.includes('onrender.com');
     
-    if (isProduction) return 'https://api.closh.in';
+    if (isProduction) return 'https://closh.onrender.com';
     return envUrl || 'http://localhost:5000';
 };
 
