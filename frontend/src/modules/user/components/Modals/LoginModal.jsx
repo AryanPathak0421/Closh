@@ -10,8 +10,8 @@ const LoginModal = ({ isOpen, onClose, onSuccess }) => {
 
     // State
     const [step, setStep] = useState(1); // 1: Mobile, 2: OTP
-    const [mobileNumber, setMobileNumber] = useState('');
-    const [otp, setOtp] = useState('');
+    const [mobileNumber, setMobileNumber] = useState('1234567890');
+    const [otp, setOtp] = useState('123456');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [resendTimer, setResendTimer] = useState(0);
@@ -20,8 +20,8 @@ const LoginModal = ({ isOpen, onClose, onSuccess }) => {
     useEffect(() => {
         if (isOpen) {
             setStep(1);
-            setMobileNumber('');
-            setOtp('');
+            setMobileNumber('1234567890');
+            setOtp('123456');
             setError('');
             setLoading(false);
         }

@@ -13,8 +13,8 @@ const DeliveryLogin = () => {
   const { sendOtp, verifyOtpAndLogin, isAuthenticated, isLoading } = useDeliveryAuthStore();
   
   const [formData, setFormData] = useState({
-    phone: '',
-    otp: '',
+    phone: '7894561230',
+    otp: '123456',
   });
   const [step, setStep] = useState('phone'); // 'phone' or 'otp'
   const [timer, setTimer] = useState(0);

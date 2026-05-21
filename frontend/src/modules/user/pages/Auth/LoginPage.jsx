@@ -8,10 +8,10 @@ import logo from '../../../../assets/animations/lottie/logo-removebg.png';
 
 const LoginPage = () => {
     const [step, setStep] = useState(1); // 1: Mobile, 2: Name/Email (New User), 3: OTP
-    const [mobileNumber, setMobileNumber] = useState('');
+    const [mobileNumber, setMobileNumber] = useState('1234567890');
     const [email, setEmail] = useState('');
     const [name, setName] = useState('');
-    const [otp, setOtp] = useState('');
+    const [otp, setOtp] = useState('123456');
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [resendTimer, setResendTimer] = useState(0);

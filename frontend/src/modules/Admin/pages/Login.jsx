@@ -40,8 +40,8 @@ const AdminLogin = () => {
   }, []);
 
   const [formData, setFormData] = useState({
-    email: '',
-    password: '',
+    email: 'admin@closh.com',
+    password: 'admin123',
   });
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);

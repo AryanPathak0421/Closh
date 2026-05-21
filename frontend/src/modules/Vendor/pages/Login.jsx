@@ -12,8 +12,8 @@ const VendorLogin = () => {
   const { login, isAuthenticated, isLoading } = useVendorAuthStore();
 
   const [formData, setFormData] = useState({
-    email: '',
-    password: '',
+    email: 'vendor@vendor.com',
+    password: 'vendor123',
   });
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
